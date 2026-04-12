@@ -73,16 +73,16 @@ function getModel(provider: string, model: string, apiKey?: string) {
     case 'groq':
       return createGroq({ apiKey: process.env.GROQ_API_KEY })(model);
     case 'openai':
-      if (!apiKey) throw new Error('OpenAI API key required');
+      if (!apiKey) throw new Error('OpenAI API key required. Add it in agent settings.');
       return createOpenAI({ apiKey })(model);
     case 'anthropic':
-      if (!apiKey) throw new Error('Anthropic API key required');
+      if (!apiKey) throw new Error('Anthropic API key required. Add it in agent settings.');
       return createAnthropic({ apiKey })(model);
     case 'google':
-      if (!apiKey) throw new Error('Google API key required');
+      if (!apiKey) throw new Error('Google API key required. Add it in agent settings.');
       return createGoogleGenerativeAI({ apiKey })(model);
     case 'perplexity':
-      if (!apiKey) throw new Error('Perplexity API key required');
+      if (!apiKey) throw new Error('Perplexity API key required. Add it in agent settings.');
       return createPerplexity({ apiKey })(model);
     default:
       return createGroq({ apiKey: process.env.GROQ_API_KEY })('llama-3.3-70b-versatile');
@@ -113,11 +113,42 @@ export async function POST(req: Request) {
       maxOutputTokens: 800,
     });
 
-    return result.toTextStreamResponse();
+    // Handle the stream and catch errors
+    const stream = result.textStream;
+
+    const encoder = new TextEncoder();
+    const readableStream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of stream) {
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          // Check for common API key errors
+          let friendlyError = errorMessage;
+          if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('invalid_api_key')) {
+            friendlyError = `Invalid API key. Please check your ${modelConfig?.provider || 'provider'} API key in agent settings.`;
+          } else if (errorMessage.includes('429') || errorMessage.includes('rate')) {
+            friendlyError = 'Rate limit exceeded. Please wait a moment and try again.';
+          } else if (errorMessage.includes('500') || errorMessage.includes('503')) {
+            friendlyError = 'The AI service is temporarily unavailable. Try again or switch to a free model.';
+          }
+          controller.enqueue(encoder.encode(`[ERROR] ${friendlyError}`));
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(readableStream, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   } catch (error) {
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } }
-    );
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(`[ERROR] ${errorMessage}`, {
+      status: 200, // Return 200 so the client can read the error
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
   }
 }

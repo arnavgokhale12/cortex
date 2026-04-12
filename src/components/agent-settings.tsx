@@ -182,12 +182,20 @@ export function AgentSettings() {
                         <label className="text-[11px] text-white/40 uppercase tracking-wider">
                           Model
                         </label>
-                        <button
-                          onClick={handleUseRecommended}
-                          className="text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
-                        >
-                          Use Recommended
-                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => setSelectedModel('groq:llama-3.3-70b-versatile')}
+                            className="text-[11px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                          >
+                            Use Free
+                          </button>
+                          <button
+                            onClick={handleUseRecommended}
+                            className="text-[11px] text-violet-400 hover:text-violet-300 transition-colors"
+                          >
+                            Use Recommended
+                          </button>
+                        </div>
                       </div>
                       <select
                         value={selectedModel}
