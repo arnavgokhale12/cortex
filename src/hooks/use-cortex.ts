@@ -1,11 +1,24 @@
 'use client';
 
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { useCortexStore } from '@/lib/store';
 import { ThoughtNode } from '@/lib/types';
 
-const DELEGATE_PATTERN = /\[DELEGATE:(\w+)\]\s*([\s\S]+?)(?=\[DELEGATE:|$)/g;
+const DELEGATE_PATTERN = /\[DELEGATE:(\w+)\]\s*([\s\S]+?)(?=\[DELEGATE:|$)/gi;
+
+const AGENT_NAME_MAP: Record<string, string> = {
+  scout: 'researcher',
+  forge: 'coder',
+  sage: 'critic',
+  muse: 'creative',
+  nexus: 'orchestrator',
+  researcher: 'researcher',
+  coder: 'coder',
+  critic: 'critic',
+  creative: 'creative',
+  orchestrator: 'orchestrator',
+};
 
 export function useCortex() {
   const {
@@ -21,16 +34,17 @@ export function useCortex() {
     reset,
   } = useCortexStore();
 
+  const conversationRef = useRef<string>('');
+
   const streamAgentResponse = useCallback(
     async (
       prompt: string,
       agentId: string,
-      context: string = ''
-    ): Promise<string> => {
+      fromAgentId?: string
+    ): Promise<{ response: string; delegations: { agentId: string; task: string }[] }> => {
       setAgentStatus(agentId, 'thinking');
       setActiveAgent(agentId);
 
-      // Create a single thought that we'll update as content streams in
       const thoughtId = nanoid();
       const streamThought: ThoughtNode = {
         id: thoughtId,
@@ -45,7 +59,11 @@ export function useCortex() {
         const response = await fetch('/api/cortex', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt, agentId, context }),
+          body: JSON.stringify({
+            prompt,
+            agentId,
+            context: conversationRef.current,
+          }),
         });
 
         if (!response.ok) throw new Error('Failed to get response');
@@ -64,78 +82,105 @@ export function useCortex() {
 
           const text = decoder.decode(value, { stream: true });
           fullResponse += text;
-
-          // Update the same thought with accumulated content
           updateThought(thoughtId, fullResponse);
         }
 
+        // Add to conversation history
+        const agentName = agents.find(a => a.id === agentId)?.name || agentId;
+        conversationRef.current += `\n\n**${agentName}**: ${fullResponse}`;
+
+        // Parse any delegations from this agent's response
+        const delegations: { agentId: string; task: string }[] = [];
+        DELEGATE_PATTERN.lastIndex = 0;
+        let match;
+
+        while ((match = DELEGATE_PATTERN.exec(fullResponse)) !== null) {
+          const targetAgentName = match[1].toLowerCase();
+          const task = match[2].trim();
+          const targetAgentId = AGENT_NAME_MAP[targetAgentName];
+
+          if (targetAgentId && targetAgentId !== agentId) {
+            // Avoid duplicates
+            if (!delegations.some(d => d.agentId === targetAgentId)) {
+              delegations.push({ agentId: targetAgentId, task });
+            }
+          }
+        }
+
         setAgentStatus(agentId, 'complete');
-        return fullResponse;
+        return { response: fullResponse, delegations };
       } catch (error) {
         setAgentStatus(agentId, 'idle');
         updateThought(thoughtId, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        throw error;
+        return { response: '', delegations: [] };
       }
     },
-    [setAgentStatus, setActiveAgent, addThought, updateThought]
+    [agents, setAgentStatus, setActiveAgent, addThought, updateThought]
   );
 
   const processWithAgents = useCallback(
     async (userPrompt: string) => {
       setProcessing(true);
+      conversationRef.current = `**User**: ${userPrompt}`;
+
+      // Track which agents have responded to avoid infinite loops
+      const respondedAgents = new Set<string>();
+      const maxRounds = 6; // Prevent infinite delegation chains
+      let round = 0;
+
+      // Queue of pending agent tasks
+      let pendingTasks: { agentId: string; task: string; fromAgentId?: string }[] = [
+        { agentId: 'orchestrator', task: userPrompt }
+      ];
 
       try {
-        // Start with orchestrator
-        const orchestratorResponse = await streamAgentResponse(
-          userPrompt,
-          'orchestrator'
-        );
+        while (pendingTasks.length > 0 && round < maxRounds) {
+          const currentTask = pendingTasks.shift()!;
+          round++;
 
-        // Parse delegations
-        const delegations: { agentId: string; task: string }[] = [];
-        let match;
-
-        // Reset regex state
-        DELEGATE_PATTERN.lastIndex = 0;
-
-        while ((match = DELEGATE_PATTERN.exec(orchestratorResponse)) !== null) {
-          const agentName = match[1].toLowerCase();
-          const task = match[2].trim();
-
-          // Map agent names to IDs
-          const agentIdMap: Record<string, string> = {
-            scout: 'researcher',
-            forge: 'coder',
-            sage: 'critic',
-            muse: 'creative',
-            researcher: 'researcher',
-            coder: 'coder',
-            critic: 'critic',
-            creative: 'creative',
-          };
-
-          const agentId = agentIdMap[agentName];
-          if (agentId && !delegations.some(d => d.agentId === agentId)) {
-            delegations.push({ agentId, task });
+          // Skip if this agent already responded this session (unless it's orchestrator)
+          if (respondedAgents.has(currentTask.agentId) && currentTask.agentId !== 'orchestrator') {
+            continue;
           }
-        }
 
-        // Execute delegated tasks
-        const context = `Original request: ${userPrompt}\n\nOrchestrator analysis:\n${orchestratorResponse}`;
+          // Add handoff visual if coming from another agent
+          if (currentTask.fromAgentId) {
+            const fromAgent = agents.find(a => a.id === currentTask.fromAgentId);
+            const toAgent = agents.find(a => a.id === currentTask.agentId);
 
-        for (const delegation of delegations) {
-          // Add handoff thought
-          const handoffThought: ThoughtNode = {
-            id: nanoid(),
-            agentId: 'orchestrator',
-            content: `Handing off to ${delegation.agentId}...`,
-            timestamp: Date.now(),
-            type: 'handoff',
-            targetAgentId: delegation.agentId,
-          };
-          addThought(handoffThought);
+            addThought({
+              id: nanoid(),
+              agentId: currentTask.fromAgentId,
+              content: `Passing to ${toAgent?.name}...`,
+              timestamp: Date.now(),
+              type: 'handoff',
+              targetAgentId: currentTask.agentId,
+            });
+          }
 
-          await streamAgentResponse(delegation.task, delegation.agentId, context);
+          // Get agent's response
+          const { response, delegations } = await streamAgentResponse(
+            currentTask.task,
+            currentTask.agentId,
+            currentTask.fromAgentId
+          );
+
+          respondedAgents.add(currentTask.agentId);
+
+          // Add new delegations to the queue
+          for (const delegation of delegations) {
+            if (!respondedAgents.has(delegation.agentId)) {
+              pendingTasks.push({
+                ...delegation,
+                fromAgentId: currentTask.agentId,
+              });
+            }
+          }
+
+          // Small delay between agents for visual effect
+          if (pendingTasks.length > 0) {
+            await new Promise(resolve => setTimeout(resolve, 300));
+          }
         }
 
         // Reset all agents to idle
