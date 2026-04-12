@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
 import { useCortexStore } from '@/lib/store';
 import { ThoughtNode } from '@/lib/types';
 
-const DELEGATE_PATTERN = /\[DELEGATE:(\w+)\]\s*(.+?)(?=\[DELEGATE:|$)/g;
+const DELEGATE_PATTERN = /\[DELEGATE:(\w+)\]\s*([\s\S]+?)(?=\[DELEGATE:|$)/g;
 
 export function useCortex() {
   const {
