@@ -2,8 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Textarea } from '@/components/ui/textarea';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface PromptInputProps {
@@ -13,6 +11,7 @@ interface PromptInputProps {
 
 export function PromptInput({ onSubmit, isProcessing }: PromptInputProps) {
   const [value, setValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
@@ -39,38 +38,60 @@ export function PromptInput({ onSubmit, isProcessing }: PromptInputProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative"
+      className="relative max-w-3xl mx-auto w-full"
     >
+      {/* Glow effect */}
+      <motion.div
+        className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-violet-500/20 via-fuchsia-500/20 to-cyan-500/20 blur-xl"
+        animate={{
+          opacity: isFocused ? 0.6 : 0.2,
+        }}
+        transition={{ duration: 0.3 }}
+      />
+
       <div
         className={cn(
-          'relative rounded-2xl border bg-card/50 backdrop-blur-sm p-1',
-          'focus-within:ring-2 focus-within:ring-primary/20 transition-all',
-          isProcessing && 'opacity-70'
+          'relative rounded-2xl transition-all duration-300',
+          'bg-white/[0.03] border border-white/[0.08]',
+          isFocused && 'bg-white/[0.05] border-white/[0.15]',
+          isProcessing && 'opacity-60'
         )}
       >
-        <Textarea
+        <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ask the agents anything..."
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          placeholder="What would you like to explore?"
           className={cn(
-            'min-h-[52px] max-h-[200px] resize-none border-0 bg-transparent',
-            'focus-visible:ring-0 focus-visible:ring-offset-0',
-            'placeholder:text-muted-foreground/50 pr-24'
+            'w-full min-h-[60px] max-h-[200px] resize-none bg-transparent',
+            'px-6 py-5 pr-32 text-[15px] text-white/90 placeholder:text-white/20',
+            'focus:outline-none font-light leading-relaxed'
           )}
           disabled={isProcessing}
         />
 
-        <div className="absolute bottom-2 right-2 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground hidden sm:block">
-            {isProcessing ? 'Processing...' : 'Enter to send'}
-          </span>
-          <Button
+        <div className="absolute bottom-4 right-4 flex items-center gap-3">
+          {!isProcessing && value.trim() && (
+            <span className="text-[11px] text-white/20 hidden sm:block">
+              Press Enter
+            </span>
+          )}
+
+          <motion.button
             onClick={handleSubmit}
             disabled={!value.trim() || isProcessing}
-            size="sm"
-            className="h-8 px-4 rounded-xl"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className={cn(
+              'h-10 px-5 rounded-xl font-medium text-sm transition-all duration-300',
+              'bg-gradient-to-r from-violet-500 to-fuchsia-500',
+              'text-white shadow-lg shadow-violet-500/25',
+              'disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none',
+              'hover:shadow-xl hover:shadow-violet-500/30'
+            )}
           >
             {isProcessing ? (
               <motion.div
@@ -79,14 +100,13 @@ export function PromptInput({ onSubmit, isProcessing }: PromptInputProps) {
                 transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
               />
             ) : (
-              'Send'
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
             )}
-          </Button>
+          </motion.button>
         </div>
       </div>
-
-      {/* Subtle gradient glow */}
-      <div className="absolute inset-0 -z-10 rounded-2xl bg-gradient-to-r from-violet-500/10 via-cyan-500/10 to-pink-500/10 blur-xl opacity-50" />
     </motion.div>
   );
 }

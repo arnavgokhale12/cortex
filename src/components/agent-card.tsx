@@ -2,8 +2,6 @@
 
 import { motion } from 'framer-motion';
 import { Agent } from '@/lib/types';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useCortexStore } from '@/lib/store';
 
@@ -24,77 +22,87 @@ export function AgentCard({ agent, isActive }: AgentCardProps) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
       onClick={handleClick}
+      whileHover={{ scale: isProcessing ? 1 : 1.02 }}
+      whileTap={{ scale: isProcessing ? 1 : 0.98 }}
       className={cn(
-        'relative flex items-center gap-3 rounded-xl border p-3 transition-all duration-300',
-        'bg-card/50 backdrop-blur-sm',
-        !isProcessing && 'cursor-pointer hover:bg-card/80',
-        isActive && 'ring-2 ring-offset-2 ring-offset-background',
-        agent.status === 'thinking' && 'animate-pulse'
+        'relative group rounded-2xl p-4 transition-all duration-500',
+        'bg-white/[0.02] hover:bg-white/[0.05]',
+        'border border-white/[0.05] hover:border-white/[0.1]',
+        !isProcessing && 'cursor-pointer',
+        isActive && 'bg-white/[0.08] border-white/[0.15]'
       )}
-      style={{
-        borderColor: isActive ? agent.color : 'var(--border)',
-        ['--tw-ring-color' as string]: agent.color,
-      }}
     >
-      {/* Glow effect when active */}
+      {/* Active glow */}
       {isActive && (
         <motion.div
-          className="absolute inset-0 -z-10 rounded-xl opacity-20 blur-xl"
+          className="absolute inset-0 -z-10 rounded-2xl opacity-30 blur-2xl"
           style={{ backgroundColor: agent.color }}
-          animate={{ opacity: [0.1, 0.3, 0.1] }}
-          transition={{ duration: 2, repeat: Infinity }}
+          animate={{ opacity: [0.2, 0.4, 0.2] }}
+          transition={{ duration: 3, repeat: Infinity }}
         />
       )}
 
-      <Avatar className="h-10 w-10 border-2" style={{ borderColor: agent.color }}>
-        <AvatarFallback
-          className="text-sm font-bold text-white"
-          style={{ backgroundColor: agent.color }}
-        >
-          {agent.avatar}
-        </AvatarFallback>
-      </Avatar>
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm">{agent.name}</span>
-          <Badge
-            variant="outline"
-            className="text-xs capitalize"
-            style={{
-              borderColor: agent.color,
-              color: agent.color,
-            }}
-          >
-            {agent.role}
-          </Badge>
-        </div>
-        <p className="text-xs text-muted-foreground truncate">
-          {agent.modelConfig.provider === 'groq' ? 'Llama' : agent.modelConfig.provider}
-        </p>
-      </div>
-
-      {/* Status indicator */}
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-4">
+        {/* Avatar */}
+        <div className="relative">
           <motion.div
-            className="h-2 w-2 rounded-full"
-            style={{ backgroundColor: agent.color }}
+            className="h-11 w-11 rounded-xl flex items-center justify-center text-white font-medium text-sm shadow-lg"
+            style={{
+              backgroundColor: agent.color,
+              boxShadow: isActive ? `0 0 30px -5px ${agent.color}` : 'none'
+            }}
             animate={
               agent.status === 'thinking' || agent.status === 'working'
-                ? { scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }
+                ? { scale: [1, 1.05, 1] }
+                : {}
+            }
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            {agent.avatar}
+          </motion.div>
+
+          {/* Status dot */}
+          <motion.div
+            className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-[#050508]"
+            style={{
+              backgroundColor: agent.status === 'idle' ? 'rgba(255,255,255,0.3)' : agent.color
+            }}
+            animate={
+              agent.status !== 'idle'
+                ? { scale: [1, 1.2, 1], opacity: [1, 0.7, 1] }
                 : {}
             }
             transition={{ duration: 1, repeat: Infinity }}
           />
-          <span className="text-xs text-muted-foreground capitalize">{agent.status}</span>
         </div>
-        {!isProcessing && (
-          <span className="text-[10px] text-muted-foreground/50">click to edit</span>
-        )}
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-white/90 text-sm">{agent.name}</span>
+            <span
+              className="text-[10px] px-2 py-0.5 rounded-full uppercase tracking-wider font-medium"
+              style={{
+                backgroundColor: `${agent.color}20`,
+                color: agent.color
+              }}
+            >
+              {agent.role}
+            </span>
+          </div>
+          <p className="text-[11px] text-white/30 mt-0.5 truncate">
+            {agent.modelConfig.displayName.split('(')[0].trim()}
+          </p>
+        </div>
+
+        {/* Edit hint */}
+        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <svg className="w-4 h-4 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </div>
       </div>
     </motion.div>
   );
