@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCortexStore } from '@/lib/store';
-import { AVAILABLE_MODELS, RECOMMENDED_MODELS, PRESET_COLORS } from '@/lib/types';
+import { AVAILABLE_MODELS, RECOMMENDED_MODELS, PRESET_COLORS, APIKeys } from '@/lib/types';
 
 export function AgentSettings() {
   const {
@@ -21,6 +21,10 @@ export function AgentSettings() {
   const [color, setColor] = useState('');
   const [selectedModel, setSelectedModel] = useState('');
   const [tab, setTab] = useState<'agent' | 'model'>('agent');
+  const [localApiKey, setLocalApiKey] = useState('');
+  const [keySaved, setKeySaved] = useState(false);
+
+  const currentProvider = selectedModel.split(':')[0] as keyof APIKeys;
 
   useEffect(() => {
     if (agent) {
@@ -28,10 +32,28 @@ export function AgentSettings() {
       setColor(agent.color);
       setSelectedModel(`${agent.modelConfig.provider}:${agent.modelConfig.model}`);
       setTab('agent');
+      setKeySaved(false);
     }
   }, [agent]);
 
+  useEffect(() => {
+    // Load existing API key for current provider
+    if (currentProvider && apiKeys[currentProvider]) {
+      setLocalApiKey(apiKeys[currentProvider] || '');
+    } else {
+      setLocalApiKey('');
+    }
+    setKeySaved(false);
+  }, [currentProvider, apiKeys]);
+
   if (!agent) return null;
+
+  const handleSaveApiKey = () => {
+    if (localApiKey.trim()) {
+      setAPIKey(currentProvider, localApiKey.trim());
+      setKeySaved(true);
+    }
+  };
 
   const handleSave = () => {
     const [provider, model] = selectedModel.split(':');
@@ -55,8 +77,8 @@ export function AgentSettings() {
     setSelectedModel(`${recommended.provider}:${recommended.model}`);
   };
 
-  const currentProvider = selectedModel.split(':')[0];
-  const needsAPIKey = currentProvider && currentProvider !== 'groq' && !apiKeys[currentProvider as keyof typeof apiKeys];
+  const needsAPIKey = currentProvider && currentProvider !== 'groq' && !apiKeys[currentProvider];
+  const hasAPIKey = currentProvider && currentProvider !== 'groq' && apiKeys[currentProvider];
 
   return (
     <AnimatePresence>
@@ -77,7 +99,8 @@ export function AgentSettings() {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md p-4"
           >
             <div className="rounded-3xl bg-[#0a0a0f] border border-white/10 shadow-2xl overflow-hidden">
               {/* Header */}
@@ -186,28 +209,63 @@ export function AgentSettings() {
                       </p>
                     </div>
 
-                    {/* API Key Warning */}
+                    {/* API Key Input */}
                     {needsAPIKey && (
                       <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
                         <label className="block text-[11px] text-amber-400 uppercase tracking-wider mb-2">
                           {currentProvider.toUpperCase()} API Key Required
                         </label>
-                        <input
-                          type="password"
-                          placeholder={`Enter your ${currentProvider} API key`}
-                          onChange={(e) => setAPIKey(currentProvider as keyof typeof apiKeys, e.target.value)}
-                          className="w-full h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            type="password"
+                            value={localApiKey}
+                            onChange={(e) => setLocalApiKey(e.target.value)}
+                            placeholder={`Enter your ${currentProvider} API key`}
+                            className="flex-1 h-10 px-3 rounded-lg bg-white/5 border border-white/10 text-white text-sm placeholder:text-white/20 focus:outline-none focus:border-amber-500/50"
+                          />
+                          <button
+                            onClick={handleSaveApiKey}
+                            disabled={!localApiKey.trim()}
+                            className="px-4 h-10 rounded-lg bg-amber-500/20 text-amber-400 text-sm font-medium hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+                          >
+                            Save
+                          </button>
+                        </div>
                         <p className="text-[10px] text-white/30 mt-2">
                           Stored locally in your browser only.
                         </p>
                       </div>
                     )}
 
+                    {/* API Key Saved */}
+                    {hasAPIKey && (
+                      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-[11px] text-emerald-400 uppercase tracking-wider">
+                            {currentProvider.toUpperCase()} API Key Configured
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            setAPIKey(currentProvider, '');
+                            setLocalApiKey('');
+                          }}
+                          className="text-[10px] text-white/30 hover:text-white/50 mt-2 transition-colors"
+                        >
+                          Remove key
+                        </button>
+                      </div>
+                    )}
+
                     {currentProvider === 'groq' && (
-                      <p className="text-[11px] text-emerald-400">
-                        Groq is free! No API key needed.
-                      </p>
+                      <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                        <p className="text-[11px] text-emerald-400">
+                          Groq is free! Using server-side API key.
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
