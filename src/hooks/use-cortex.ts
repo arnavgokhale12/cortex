@@ -15,6 +15,7 @@ export function useCortex() {
     activeAgentId,
     setAgentStatus,
     addThought,
+    updateThought,
     setProcessing,
     setActiveAgent,
     reset,
@@ -29,15 +30,16 @@ export function useCortex() {
       setAgentStatus(agentId, 'thinking');
       setActiveAgent(agentId);
 
-      // Add initial thinking thought
-      const thinkingThought: ThoughtNode = {
-        id: nanoid(),
+      // Create a single thought that we'll update as content streams in
+      const thoughtId = nanoid();
+      const streamThought: ThoughtNode = {
+        id: thoughtId,
         agentId,
-        content: 'Analyzing request...',
+        content: '',
         timestamp: Date.now(),
-        type: 'thought',
+        type: 'action',
       };
-      addThought(thinkingThought);
+      addThought(streamThought);
 
       try {
         const response = await fetch('/api/cortex', {
@@ -53,7 +55,6 @@ export function useCortex() {
 
         const decoder = new TextDecoder();
         let fullResponse = '';
-        let currentChunk = '';
 
         setAgentStatus(agentId, 'working');
 
@@ -62,39 +63,21 @@ export function useCortex() {
           if (done) break;
 
           const text = decoder.decode(value, { stream: true });
-          currentChunk += text;
           fullResponse += text;
 
-          // Stream thoughts in chunks for visual effect
-          if (currentChunk.length > 50 || done) {
-            const streamThought: ThoughtNode = {
-              id: nanoid(),
-              agentId,
-              content: currentChunk,
-              timestamp: Date.now(),
-              type: 'action',
-            };
-            addThought(streamThought);
-            currentChunk = '';
-          }
+          // Update the same thought with accumulated content
+          updateThought(thoughtId, fullResponse);
         }
 
         setAgentStatus(agentId, 'complete');
         return fullResponse;
       } catch (error) {
         setAgentStatus(agentId, 'idle');
-        const errorThought: ThoughtNode = {
-          id: nanoid(),
-          agentId,
-          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          timestamp: Date.now(),
-          type: 'result',
-        };
-        addThought(errorThought);
+        updateThought(thoughtId, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         throw error;
       }
     },
-    [setAgentStatus, setActiveAgent, addThought]
+    [setAgentStatus, setActiveAgent, addThought, updateThought]
   );
 
   const processWithAgents = useCallback(
@@ -111,6 +94,9 @@ export function useCortex() {
         // Parse delegations
         const delegations: { agentId: string; task: string }[] = [];
         let match;
+
+        // Reset regex state
+        DELEGATE_PATTERN.lastIndex = 0;
 
         while ((match = DELEGATE_PATTERN.exec(orchestratorResponse)) !== null) {
           const agentName = match[1].toLowerCase();
@@ -129,7 +115,7 @@ export function useCortex() {
           };
 
           const agentId = agentIdMap[agentName];
-          if (agentId) {
+          if (agentId && !delegations.some(d => d.agentId === agentId)) {
             delegations.push({ agentId, task });
           }
         }
@@ -142,7 +128,7 @@ export function useCortex() {
           const handoffThought: ThoughtNode = {
             id: nanoid(),
             agentId: 'orchestrator',
-            content: `Delegating: ${delegation.task}`,
+            content: `Handing off to ${delegation.agentId}...`,
             timestamp: Date.now(),
             type: 'handoff',
             targetAgentId: delegation.agentId,

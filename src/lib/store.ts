@@ -10,6 +10,7 @@ interface CortexState {
 
   setAgentStatus: (agentId: string, status: Agent['status']) => void;
   addThought: (thought: ThoughtNode) => void;
+  updateThought: (thoughtId: string, content: string) => void;
   addMessage: (message: Message) => void;
   setProcessing: (isProcessing: boolean) => void;
   setActiveAgent: (agentId: string | null) => void;
@@ -33,6 +34,13 @@ export const useCortexStore = create<CortexState>((set) => ({
   addThought: (thought) =>
     set((state) => ({
       thoughts: [...state.thoughts, thought],
+    })),
+
+  updateThought: (thoughtId, content) =>
+    set((state) => ({
+      thoughts: state.thoughts.map((t) =>
+        t.id === thoughtId ? { ...t, content } : t
+      ),
     })),
 
   addMessage: (message) =>

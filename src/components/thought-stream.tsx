@@ -2,7 +2,6 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { ThoughtNode, Agent } from '@/lib/types';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { useEffect, useRef } from 'react';
 
@@ -13,77 +12,78 @@ interface ThoughtStreamProps {
 }
 
 export function ThoughtStream({ thoughts, agents, onExampleClick }: ThoughtStreamProps) {
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const bottomRef = useRef<HTMLDivElement>(null);
 
+  // Auto-scroll to bottom when thoughts change
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [thoughts]);
 
   const getAgent = (agentId: string) => agents.find((a) => a.id === agentId);
 
-  const getTypeIcon = (type: ThoughtNode['type']) => {
+  const getTypeLabel = (type: ThoughtNode['type']) => {
     switch (type) {
-      case 'thought':
-        return '...';
-      case 'action':
-        return '>';
-      case 'result':
-        return '*';
       case 'handoff':
-        return '->';
+        return 'delegating';
       default:
-        return '>';
+        return 'thinking';
     }
   };
 
   return (
-    <ScrollArea className="h-full" ref={scrollRef}>
-      <div className="space-y-2 p-4">
+    <div ref={containerRef} className="h-full overflow-y-auto scroll-smooth">
+      <div className="space-y-3 p-4">
         <AnimatePresence mode="popLayout">
-          {thoughts.map((thought, index) => {
+          {thoughts.map((thought) => {
             const agent = getAgent(thought.agentId);
             const targetAgent = thought.targetAgentId
               ? getAgent(thought.targetAgentId)
               : null;
 
+            // Skip empty thoughts
+            if (!thought.content) return null;
+
             return (
               <motion.div
                 key={thought.id}
-                initial={{ opacity: 0, x: -20, height: 0 }}
-                animate={{ opacity: 1, x: 0, height: 'auto' }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.3, delay: index * 0.02 }}
+                layout
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
                 className={cn(
-                  'relative rounded-lg border bg-card/30 p-3 backdrop-blur-sm',
-                  thought.type === 'handoff' && 'border-dashed'
+                  'relative rounded-xl border bg-card/40 p-4 backdrop-blur-sm',
+                  thought.type === 'handoff' && 'border-dashed bg-card/20'
                 )}
                 style={{
-                  borderLeftWidth: 3,
+                  borderLeftWidth: 4,
                   borderLeftColor: agent?.color || 'var(--border)',
                 }}
               >
-                {/* Agent indicator */}
-                <div className="flex items-center gap-2 mb-1.5">
+                {/* Agent header */}
+                <div className="flex items-center gap-2 mb-2">
                   <div
-                    className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                    className="h-6 w-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm"
                     style={{ backgroundColor: agent?.color }}
                   >
                     {agent?.avatar}
                   </div>
                   <span
-                    className="text-xs font-medium"
+                    className="text-sm font-semibold"
                     style={{ color: agent?.color }}
                   >
                     {agent?.name}
                   </span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {getTypeIcon(thought.type)}
-                  </span>
                   {targetAgent && (
                     <>
-                      <span className="text-xs text-muted-foreground">to</span>
+                      <span className="text-xs text-muted-foreground">-&gt;</span>
+                      <div
+                        className="h-5 w-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white"
+                        style={{ backgroundColor: targetAgent.color }}
+                      >
+                        {targetAgent.avatar}
+                      </div>
                       <span
                         className="text-xs font-medium"
                         style={{ color: targetAgent.color }}
@@ -92,17 +92,17 @@ export function ThoughtStream({ thoughts, agents, onExampleClick }: ThoughtStrea
                       </span>
                     </>
                   )}
+                  <span className="text-xs text-muted-foreground ml-auto">
+                    {getTypeLabel(thought.type)}
+                  </span>
                 </div>
 
                 {/* Content */}
-                <p className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                  {thought.content}
-                </p>
-
-                {/* Timestamp */}
-                <span className="absolute top-2 right-2 text-[10px] text-muted-foreground font-mono">
-                  {new Date(thought.timestamp).toLocaleTimeString()}
-                </span>
+                <div className="text-sm text-foreground/90 whitespace-pre-wrap leading-relaxed">
+                  {thought.content || (
+                    <span className="text-muted-foreground italic">Thinking...</span>
+                  )}
+                </div>
               </motion.div>
             );
           })}
@@ -112,14 +112,13 @@ export function ThoughtStream({ thoughts, agents, onExampleClick }: ThoughtStrea
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="flex flex-col items-center justify-center h-full text-center px-8"
+            className="flex flex-col items-center justify-center min-h-[400px] text-center px-8"
           >
             <div className="mb-6">
-              <div className="text-4xl mb-2">...</div>
-              <h3 className="text-lg font-semibold mb-2">Ready to collaborate</h3>
+              <div className="text-5xl mb-3 opacity-50">...</div>
+              <h3 className="text-xl font-semibold mb-2">Ready to collaborate</h3>
               <p className="text-sm text-muted-foreground max-w-md">
                 Watch AI agents reason, delegate, and solve problems together in real-time.
-                Try one of these examples:
               </p>
             </div>
             <div className="grid gap-2 w-full max-w-md">
@@ -131,7 +130,7 @@ export function ThoughtStream({ thoughts, agents, onExampleClick }: ThoughtStrea
                 <button
                   key={prompt}
                   onClick={() => onExampleClick?.(prompt)}
-                  className="text-left px-4 py-3 rounded-lg border bg-card/50 hover:bg-card hover:border-primary/50 transition-colors text-sm"
+                  className="text-left px-4 py-3 rounded-xl border bg-card/50 hover:bg-card hover:border-primary/50 transition-all text-sm hover:scale-[1.02]"
                 >
                   {prompt}
                 </button>
@@ -139,7 +138,10 @@ export function ThoughtStream({ thoughts, agents, onExampleClick }: ThoughtStrea
             </div>
           </motion.div>
         )}
+
+        {/* Scroll anchor */}
+        <div ref={bottomRef} />
       </div>
-    </ScrollArea>
+    </div>
   );
 }
