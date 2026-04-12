@@ -26,6 +26,7 @@ export function useCortex() {
     thoughts,
     isProcessing,
     activeAgentId,
+    apiKeys,
     setAgentStatus,
     addThought,
     updateThought,
@@ -38,6 +39,9 @@ export function useCortex() {
 
   const streamAgentResponse = useCallback(
     async (prompt: string, agentId: string): Promise<string> => {
+      const agent = agents.find((a) => a.id === agentId);
+      if (!agent) return '';
+
       setAgentStatus(agentId, 'thinking');
       setActiveAgent(agentId);
 
@@ -51,6 +55,9 @@ export function useCortex() {
       });
 
       try {
+        // Get the API key for this agent's provider
+        const providerKey = apiKeys[agent.modelConfig.provider as keyof typeof apiKeys];
+
         const response = await fetch('/api/cortex', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -58,10 +65,15 @@ export function useCortex() {
             prompt,
             agentId,
             context: conversationRef.current,
+            modelConfig: agent.modelConfig,
+            apiKey: providerKey,
           }),
         });
 
-        if (!response.ok) throw new Error('Failed to get response');
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to get response');
+        }
 
         const reader = response.body?.getReader();
         if (!reader) throw new Error('No reader available');
@@ -81,18 +93,18 @@ export function useCortex() {
         }
 
         // Add to conversation history
-        const agentName = agents.find(a => a.id === agentId)?.name || agentId;
-        conversationRef.current += `\n\n${agentName}: ${fullResponse}`;
+        conversationRef.current += `\n\n${agent.name}: ${fullResponse}`;
 
         setAgentStatus(agentId, 'complete');
         return fullResponse;
       } catch (error) {
         setAgentStatus(agentId, 'idle');
-        updateThought(thoughtId, `Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        updateThought(thoughtId, `Error: ${errorMessage}`);
         return '';
       }
     },
-    [agents, setAgentStatus, setActiveAgent, addThought, updateThought]
+    [agents, apiKeys, setAgentStatus, setActiveAgent, addThought, updateThought]
   );
 
   const processWithAgents = useCallback(
@@ -124,11 +136,13 @@ export function useCortex() {
         for (const agentId of delegations) {
           if (respondedAgents.has(agentId)) continue;
 
+          const agent = agents.find((a) => a.id === agentId);
+
           // Add handoff
           addThought({
             id: nanoid(),
             agentId: 'orchestrator',
-            content: `Handing off to ${agents.find(a => a.id === agentId)?.name}...`,
+            content: `Handing off to ${agent?.name || agentId}...`,
             timestamp: Date.now(),
             type: 'handoff',
             targetAgentId: agentId,

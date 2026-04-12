@@ -1,11 +1,11 @@
 import { streamText } from 'ai';
 import { createGroq } from '@ai-sdk/groq';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { createPerplexity } from '@ai-sdk/perplexity';
 
-const groq = createGroq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
-const AGENT_PROMPTS = {
+const AGENT_PROMPTS: Record<string, string> = {
   orchestrator: `You are Nexus, the orchestrator in Cortex - a collaborative AI system.
 
 Your style: Direct, strategic, sees the big picture. You coordinate but also contribute insights.
@@ -21,8 +21,7 @@ You can delegate to:
 - Sage: Critical analysis, finding flaws
 - Muse: Creative ideas, alternatives
 
-Keep responses concise (under 150 words). Be conversational, not robotic.
-After delegations, you may add a brief thought about what you expect to learn.`,
+Keep responses concise (under 150 words). Be conversational, not robotic.`,
 
   researcher: `You are Scout, a researcher in Cortex.
 
@@ -32,8 +31,6 @@ When responding:
 - Lead with your most interesting finding
 - Use [INSIGHT] for key discoveries
 - Keep it conversational and engaging
-- If you spot something that needs Sage's critique or Muse's creativity, say so naturally
-- You can suggest "[DELEGATE:AgentName]" if you think another perspective would help
 
 Be concise (under 150 words). Share what's genuinely interesting, skip the obvious.`,
 
@@ -45,8 +42,6 @@ When responding:
 - Lead with your approach, then show code
 - Use \`\`\` for code blocks
 - Explain interesting design choices briefly
-- If you see a potential issue, mention it
-- You might ask Sage to review or Muse for alternative approaches
 
 Be concise. Show working code, not lectures. Under 200 words unless code requires more.`,
 
@@ -58,8 +53,6 @@ When responding:
 - Lead with your overall assessment
 - Use [ISSUE] for problems and [SUGGEST] for improvements
 - Be direct but not harsh
-- Acknowledge what works before critiquing
-- You might ask Scout for more data or challenge Muse's ideas
 
 Be concise (under 150 words). Quality critique over quantity.`,
 
@@ -70,30 +63,61 @@ Your style: Lateral thinker, sees unconventional angles. You spark new direction
 When responding:
 - Lead with your most unexpected idea
 - Use [IDEA] for creative suggestions
-- Build on others' work, don't just add unrelated ideas
 - Challenge assumptions when useful
-- You might ask Forge if something is feasible
 
 Be concise (under 150 words). One great idea beats five mediocre ones.`,
 };
 
+function getModel(provider: string, model: string, apiKey?: string) {
+  switch (provider) {
+    case 'groq':
+      return createGroq({ apiKey: process.env.GROQ_API_KEY })(model);
+    case 'openai':
+      if (!apiKey) throw new Error('OpenAI API key required');
+      return createOpenAI({ apiKey })(model);
+    case 'anthropic':
+      if (!apiKey) throw new Error('Anthropic API key required');
+      return createAnthropic({ apiKey })(model);
+    case 'google':
+      if (!apiKey) throw new Error('Google API key required');
+      return createGoogleGenerativeAI({ apiKey })(model);
+    case 'perplexity':
+      if (!apiKey) throw new Error('Perplexity API key required');
+      return createPerplexity({ apiKey })(model);
+    default:
+      return createGroq({ apiKey: process.env.GROQ_API_KEY })('llama-3.3-70b-versatile');
+  }
+}
+
 export async function POST(req: Request) {
-  const { prompt, agentId, context } = await req.json();
+  const { prompt, agentId, context, modelConfig, apiKey } = await req.json();
 
-  const systemPrompt = AGENT_PROMPTS[agentId as keyof typeof AGENT_PROMPTS] || AGENT_PROMPTS.orchestrator;
+  const systemPrompt = AGENT_PROMPTS[agentId] || AGENT_PROMPTS.orchestrator;
 
-  // Build a more conversational context
   let fullPrompt = prompt;
   if (context) {
     fullPrompt = `Here's what's been discussed so far:\n\n${context}\n\n---\n\nNow it's your turn. ${prompt}`;
   }
 
-  const result = streamText({
-    model: groq('llama-3.3-70b-versatile'),
-    system: systemPrompt,
-    prompt: fullPrompt,
-    maxOutputTokens: 800,
-  });
+  try {
+    const model = getModel(
+      modelConfig?.provider || 'groq',
+      modelConfig?.model || 'llama-3.3-70b-versatile',
+      apiKey
+    );
 
-  return result.toTextStreamResponse();
+    const result = streamText({
+      model,
+      system: systemPrompt,
+      prompt: fullPrompt,
+      maxOutputTokens: 800,
+    });
+
+    return result.toTextStreamResponse();
+  } catch (error) {
+    return new Response(
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } }
+    );
+  }
 }

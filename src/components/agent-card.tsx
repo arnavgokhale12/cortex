@@ -5,6 +5,7 @@ import { Agent } from '@/lib/types';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useCortexStore } from '@/lib/store';
 
 interface AgentCardProps {
   agent: Agent;
@@ -12,14 +13,24 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent, isActive }: AgentCardProps) {
+  const { setEditingAgent, isProcessing } = useCortexStore();
+
+  const handleClick = () => {
+    if (!isProcessing) {
+      setEditingAgent(agent.id);
+    }
+  };
+
   return (
     <motion.div
       layout
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
+      onClick={handleClick}
       className={cn(
         'relative flex items-center gap-3 rounded-xl border p-3 transition-all duration-300',
         'bg-card/50 backdrop-blur-sm',
+        !isProcessing && 'cursor-pointer hover:bg-card/80',
         isActive && 'ring-2 ring-offset-2 ring-offset-background',
         agent.status === 'thinking' && 'animate-pulse'
       )}
@@ -61,22 +72,29 @@ export function AgentCard({ agent, isActive }: AgentCardProps) {
             {agent.role}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground truncate">{agent.description}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          {agent.modelConfig.provider === 'groq' ? 'Llama' : agent.modelConfig.provider}
+        </p>
       </div>
 
       {/* Status indicator */}
-      <div className="flex items-center gap-1.5">
-        <motion.div
-          className="h-2 w-2 rounded-full"
-          style={{ backgroundColor: agent.color }}
-          animate={
-            agent.status === 'thinking' || agent.status === 'working'
-              ? { scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }
-              : {}
-          }
-          transition={{ duration: 1, repeat: Infinity }}
-        />
-        <span className="text-xs text-muted-foreground capitalize">{agent.status}</span>
+      <div className="flex flex-col items-end gap-1">
+        <div className="flex items-center gap-1.5">
+          <motion.div
+            className="h-2 w-2 rounded-full"
+            style={{ backgroundColor: agent.color }}
+            animate={
+              agent.status === 'thinking' || agent.status === 'working'
+                ? { scale: [1, 1.3, 1], opacity: [1, 0.5, 1] }
+                : {}
+            }
+            transition={{ duration: 1, repeat: Infinity }}
+          />
+          <span className="text-xs text-muted-foreground capitalize">{agent.status}</span>
+        </div>
+        {!isProcessing && (
+          <span className="text-[10px] text-muted-foreground/50">click to edit</span>
+        )}
       </div>
     </motion.div>
   );

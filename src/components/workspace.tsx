@@ -8,6 +8,7 @@ import { PromptInput } from './prompt-input';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { AgentNetwork } from './agent-network';
+import { AgentSettings } from './agent-settings';
 
 export function Workspace() {
   const { agents, thoughts, isProcessing, activeAgentId, processWithAgents, reset } =
@@ -15,6 +16,7 @@ export function Workspace() {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      <AgentSettings />
       {/* Header */}
       <header className="flex items-center justify-between px-6 py-4 border-b bg-background/80 backdrop-blur-sm">
         <div className="flex items-center gap-3">
