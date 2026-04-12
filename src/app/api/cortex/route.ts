@@ -89,8 +89,28 @@ function getModel(provider: string, model: string, apiKey?: string) {
   }
 }
 
+function formatError(error: unknown, provider: string): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (message.includes('401') || message.includes('Unauthorized') || message.includes('invalid') || message.includes('Incorrect API key')) {
+    return `Invalid ${provider.toUpperCase()} API key. Please check your key in agent settings and try again.`;
+  }
+  if (message.includes('429') || message.includes('rate')) {
+    return 'Rate limit exceeded. Please wait a moment and try again.';
+  }
+  if (message.includes('500') || message.includes('503')) {
+    return 'AI service temporarily unavailable. Try switching to a free model.';
+  }
+  if (message.includes('required')) {
+    return message;
+  }
+
+  return `Error: ${message}`;
+}
+
 export async function POST(req: Request) {
   const { prompt, agentId, context, modelConfig, apiKey } = await req.json();
+  const provider = modelConfig?.provider || 'groq';
 
   const systemPrompt = AGENT_PROMPTS[agentId] || AGENT_PROMPTS.orchestrator;
 
@@ -99,56 +119,38 @@ export async function POST(req: Request) {
     fullPrompt = `Here's what's been discussed so far:\n\n${context}\n\n---\n\nNow it's your turn. ${prompt}`;
   }
 
-  try {
-    const model = getModel(
-      modelConfig?.provider || 'groq',
-      modelConfig?.model || 'llama-3.3-70b-versatile',
-      apiKey
-    );
+  // Create a stream that handles errors properly
+  const encoder = new TextEncoder();
 
-    const result = streamText({
-      model,
-      system: systemPrompt,
-      prompt: fullPrompt,
-      maxOutputTokens: 800,
-    });
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const model = getModel(
+          provider,
+          modelConfig?.model || 'llama-3.3-70b-versatile',
+          apiKey
+        );
 
-    // Handle the stream and catch errors
-    const stream = result.textStream;
+        const result = streamText({
+          model,
+          system: systemPrompt,
+          prompt: fullPrompt,
+          maxOutputTokens: 800,
+        });
 
-    const encoder = new TextEncoder();
-    const readableStream = new ReadableStream({
-      async start(controller) {
-        try {
-          for await (const chunk of stream) {
-            controller.enqueue(encoder.encode(chunk));
-          }
-          controller.close();
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          // Check for common API key errors
-          let friendlyError = errorMessage;
-          if (errorMessage.includes('401') || errorMessage.includes('Unauthorized') || errorMessage.includes('invalid_api_key')) {
-            friendlyError = `Invalid API key. Please check your ${modelConfig?.provider || 'provider'} API key in agent settings.`;
-          } else if (errorMessage.includes('429') || errorMessage.includes('rate')) {
-            friendlyError = 'Rate limit exceeded. Please wait a moment and try again.';
-          } else if (errorMessage.includes('500') || errorMessage.includes('503')) {
-            friendlyError = 'The AI service is temporarily unavailable. Try again or switch to a free model.';
-          }
-          controller.enqueue(encoder.encode(`[ERROR] ${friendlyError}`));
-          controller.close();
+        for await (const chunk of result.textStream) {
+          controller.enqueue(encoder.encode(chunk));
         }
-      },
-    });
+        controller.close();
+      } catch (error) {
+        const errorMessage = formatError(error, provider);
+        controller.enqueue(encoder.encode(errorMessage));
+        controller.close();
+      }
+    },
+  });
 
-    return new Response(readableStream, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    });
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(`[ERROR] ${errorMessage}`, {
-      status: 200, // Return 200 so the client can read the error
-      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
-    });
-  }
+  return new Response(stream, {
+    headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+  });
 }
