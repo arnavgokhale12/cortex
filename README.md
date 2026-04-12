@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Cortex - AI Agent Workspace
+
+A visually stunning multi-agent AI system that demonstrates real-time collaboration between specialized AI agents. Watch agents reason, delegate tasks, and solve problems together.
+
+## Features
+
+- **5 Specialized Agents**: Orchestrator (Nexus), Researcher (Scout), Coder (Forge), Critic (Sage), and Creative (Muse)
+- **Real-time Streaming**: See agent thoughts appear as they're generated
+- **Visual Agent Network**: Animated visualization of agent connections and activity
+- **Task Delegation**: Watch the orchestrator break down problems and delegate to specialists
+- **Beautiful Dark UI**: Glassmorphic design with smooth animations
+
+## Tech Stack
+
+- **Next.js 16** with App Router
+- **Vercel AI SDK** with AI Gateway
+- **Framer Motion** for animations
+- **Tailwind CSS** + **shadcn/ui**
+- **Zustand** for state management
 
 ## Getting Started
 
-First, run the development server:
-
+1. Install dependencies:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+2. Set up environment variables:
+```bash
+cp .env.example .env.local
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Add your API key:
+- `ANTHROPIC_API_KEY` for direct Anthropic access, or
+- Configure Vercel AI Gateway in your Vercel project
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+3. Run the development server:
+```bash
+npm run dev
+```
 
-## Learn More
+4. Open [http://localhost:3000](http://localhost:3000)
 
-To learn more about Next.js, take a look at the following resources:
+## How It Works
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **User Input**: Enter a prompt or click an example
+2. **Orchestration**: Nexus analyzes the request and delegates subtasks
+3. **Specialist Work**: Relevant agents (Scout, Forge, Sage, Muse) process their assigned tasks
+4. **Streaming Output**: Watch thoughts stream in real-time with agent attribution
+5. **Visual Feedback**: See active agents pulse and connections light up
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The easiest way to deploy is via [Vercel](https://vercel.com/new):
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Push to GitHub
+2. Import to Vercel
+3. Add your `ANTHROPIC_API_KEY` environment variable
+4. Deploy
+
+## License
+
+MIT
