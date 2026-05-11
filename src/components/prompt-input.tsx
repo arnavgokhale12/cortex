@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 interface PromptInputProps {
   onSubmit: (prompt: string) => void;
@@ -38,25 +39,19 @@ export function PromptInput({ onSubmit, isProcessing }: PromptInputProps) {
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative max-w-3xl mx-auto w-full"
+      className="relative mx-auto w-full"
     >
-      {/* Glow effect */}
-      <motion.div
-        className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-violet-500/20 via-fuchsia-500/20 to-cyan-500/20 blur-xl"
-        animate={{
-          opacity: isFocused ? 0.6 : 0.2,
-        }}
-        transition={{ duration: 0.3 }}
-      />
-
       <div
         className={cn(
-          'relative rounded-2xl transition-all duration-300',
-          'bg-white/[0.03] border border-white/[0.08]',
-          isFocused && 'bg-white/[0.05] border-white/[0.15]',
+          'relative overflow-hidden rounded-[18px] transition-all duration-300',
+          'border border-[#241d18]/10 bg-[#fffdf7]/90 shadow-[0_24px_80px_rgba(68,54,35,0.18)] backdrop-blur-2xl',
+          isFocused && 'border-[#7c5cff]/35 shadow-[0_24px_90px_rgba(97,77,190,0.2)]',
           isProcessing && 'opacity-60'
         )}
       >
+        <div className="absolute left-0 top-0 grid h-full w-12 place-items-start pt-5 text-[#7c5cff]">
+          <span className="font-mono text-sm">$</span>
+        </div>
         <textarea
           ref={textareaRef}
           value={value}
@@ -66,16 +61,16 @@ export function PromptInput({ onSubmit, isProcessing }: PromptInputProps) {
           onBlur={() => setIsFocused(false)}
           placeholder="What would you like to explore?"
           className={cn(
-            'w-full min-h-[60px] max-h-[200px] resize-none bg-transparent',
-            'px-6 py-5 pr-32 text-[15px] text-white/90 placeholder:text-white/20',
-            'focus:outline-none font-light leading-relaxed'
+            'w-full min-h-[64px] max-h-[180px] resize-none bg-transparent',
+            'px-12 py-5 pr-36 text-[15px] text-[#2d241d] placeholder:text-[#9b8e7d]',
+            'focus:outline-none leading-relaxed'
           )}
           disabled={isProcessing}
         />
 
         <div className="absolute bottom-4 right-4 flex items-center gap-3">
           {!isProcessing && value.trim() && (
-            <span className="text-[11px] text-white/20 hidden sm:block">
+            <span className="hidden text-[11px] uppercase tracking-[0.16em] text-[#9b8e7d] sm:block">
               Press Enter
             </span>
           )}
@@ -86,23 +81,18 @@ export function PromptInput({ onSubmit, isProcessing }: PromptInputProps) {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className={cn(
-              'h-10 px-5 rounded-xl font-medium text-sm transition-all duration-300',
-              'bg-gradient-to-r from-violet-500 to-fuchsia-500',
-              'text-white shadow-lg shadow-violet-500/25',
+              'h-10 px-4 rounded-xl font-mono text-xs uppercase tracking-[0.14em] transition-all duration-300',
+              'bg-[#241d18] text-[#fff8ed] shadow-lg shadow-[#241d18]/20',
               'disabled:opacity-30 disabled:cursor-not-allowed disabled:shadow-none',
-              'hover:shadow-xl hover:shadow-violet-500/30'
+              'hover:bg-[#352a22]'
             )}
           >
             {isProcessing ? (
-              <motion.div
-                className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              />
+              <Loader2 className="size-4 animate-spin" />
             ) : (
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-              </svg>
+              <span className="inline-flex items-center gap-1.5">
+                Analyze <ArrowRight className="size-3.5" />
+              </span>
             )}
           </motion.button>
         </div>

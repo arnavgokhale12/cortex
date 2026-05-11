@@ -3,7 +3,6 @@
 import { useCallback, useRef } from 'react';
 import { nanoid } from 'nanoid';
 import { useCortexStore } from '@/lib/store';
-import { ThoughtNode } from '@/lib/types';
 
 const DELEGATE_PATTERN = /\[DELEGATE:(\w+)\]/gi;
 

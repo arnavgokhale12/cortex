@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCortexStore } from '@/lib/store';
@@ -22,7 +24,6 @@ export function AgentSettings() {
   const [selectedModel, setSelectedModel] = useState('');
   const [tab, setTab] = useState<'agent' | 'model'>('agent');
   const [localApiKey, setLocalApiKey] = useState('');
-  const [keySaved, setKeySaved] = useState(false);
 
   const currentProvider = selectedModel.split(':')[0] as keyof APIKeys;
 
@@ -32,7 +33,6 @@ export function AgentSettings() {
       setColor(agent.color);
       setSelectedModel(`${agent.modelConfig.provider}:${agent.modelConfig.model}`);
       setTab('agent');
-      setKeySaved(false);
     }
   }, [agent]);
 
@@ -43,7 +43,6 @@ export function AgentSettings() {
     } else {
       setLocalApiKey('');
     }
-    setKeySaved(false);
   }, [currentProvider, apiKeys]);
 
   if (!agent) return null;
@@ -51,7 +50,6 @@ export function AgentSettings() {
   const handleSaveApiKey = () => {
     if (localApiKey.trim()) {
       setAPIKey(currentProvider, localApiKey.trim());
-      setKeySaved(true);
     }
   };
 

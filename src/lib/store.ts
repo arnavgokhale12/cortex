@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Agent, ThoughtNode, APIKeys, DEFAULT_AGENTS, ModelConfig } from './types';
+import { Agent, ThoughtNode, APIKeys, DEFAULT_AGENTS } from './types';
 
 interface CortexState {
   agents: Agent[];

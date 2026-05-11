@@ -213,3 +213,29 @@
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
+
+.canvas-path {
+  fill: none;
+  stroke: rgba(106, 83, 58, 0.24);
+  stroke-width: 1.4;
+  stroke-dasharray: 5 7;
+  stroke-linecap: round;
+}
+
+.canvas-path-solid {
+  fill: none;
+  stroke: rgba(124, 92, 255, 0.42);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.canvas-path-active {
+  stroke-dasharray: 8 10;
+  animation: path-flow 1.6s linear infinite;
+}
+
+@keyframes path-flow {
+  to {
+    stroke-dashoffset: -36;
+  }
+}
