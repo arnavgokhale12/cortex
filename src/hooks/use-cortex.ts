@@ -98,6 +98,11 @@ export function useCortex() {
           updateThought(thoughtId, fullResponse);
         }
 
+        // Handle empty response
+        if (!fullResponse.trim()) {
+          updateThought(thoughtId, 'No response received. Please check your API key settings.');
+        }
+
         // Add to conversation history
         conversationRef.current += `\n\n${agent.name}: ${fullResponse}`;
 

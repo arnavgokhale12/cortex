@@ -90,10 +90,36 @@ function getModel(provider: string, model: string, apiKey?: string) {
 }
 
 function formatError(error: unknown, provider: string): string {
-  const message = error instanceof Error ? error.message : String(error);
+  let message = '';
+
+  if (error instanceof Error) {
+    message = error.message;
+  } else if (typeof error === 'string') {
+    message = error;
+  } else if (typeof error === 'object' && error !== null) {
+    // Handle AI SDK error objects
+    const errObj = error as Record<string, unknown>;
+    if (typeof errObj.message === 'string') {
+      message = errObj.message;
+    } else if (typeof errObj.error === 'string') {
+      message = errObj.error;
+    } else {
+      message = JSON.stringify(error);
+    }
+  } else {
+    message = String(error);
+  }
+
+  // Ensure message is a string before calling includes
+  if (typeof message !== 'string') {
+    message = String(message);
+  }
 
   if (message.includes('401') || message.includes('Unauthorized') || message.includes('invalid') || message.includes('Incorrect API key')) {
     return `Invalid ${provider.toUpperCase()} API key. Please check your key in agent settings and try again.`;
+  }
+  if (message.includes('LoadAPIKeyError') || message.includes('API key is missing')) {
+    return `${provider.toUpperCase()} API key not configured. Please add your API key in agent settings.`;
   }
   if (message.includes('429') || message.includes('rate')) {
     return 'Rate limit exceeded. Please wait a moment and try again.';
@@ -116,37 +142,54 @@ export async function POST(req: Request) {
 
   let fullPrompt = prompt;
   if (context) {
-    fullPrompt = `Here's what's been discussed so far:\n\n${context}\n\n---\n\nNow it's your turn. ${prompt}`;
+    fullPrompt = `Here's what's been discussed so far:\n\n${context}\n\n---\n\n${prompt}`;
   }
 
-  // Create a stream that handles errors properly
+  // Pre-validate model creation
+  let model;
+  try {
+    model = getModel(
+      provider,
+      modelConfig?.model || 'llama-3.3-70b-versatile',
+      apiKey
+    );
+  } catch (error) {
+    return new Response(formatError(error, provider), {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    });
+  }
+
+  // Track errors
+  let streamError: string | null = null;
   const encoder = new TextEncoder();
 
+  const result = streamText({
+    model,
+    system: systemPrompt,
+    prompt: fullPrompt,
+    maxOutputTokens: 800,
+    onError: (error) => {
+      streamError = formatError(error, provider);
+    },
+  });
+
+  // Create a readable stream that handles errors
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        const model = getModel(
-          provider,
-          modelConfig?.model || 'llama-3.3-70b-versatile',
-          apiKey
-        );
-
-        const result = streamText({
-          model,
-          system: systemPrompt,
-          prompt: fullPrompt,
-          maxOutputTokens: 800,
-        });
-
         for await (const chunk of result.textStream) {
           controller.enqueue(encoder.encode(chunk));
         }
-        controller.close();
-      } catch (error) {
-        const errorMessage = formatError(error, provider);
-        controller.enqueue(encoder.encode(errorMessage));
-        controller.close();
+      } catch {
+        // Error already captured by onError
       }
+
+      // If there was an error and no content was sent, send the error message
+      if (streamError) {
+        controller.enqueue(encoder.encode(streamError));
+      }
+
+      controller.close();
     },
   });
 
